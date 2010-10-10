@@ -16,7 +16,7 @@ License: Apache License v2.0
 Without any parameters this outputs a navigation menu identical to MojoMotor's {mojo:site:page_list} tag.
 
 
-##Parameters:
+##Parameters
 
 class/id // same as default mojomotor page_list
 
