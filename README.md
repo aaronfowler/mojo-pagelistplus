@@ -9,6 +9,10 @@ Author: Aaron Fowler (http://twitter.com/adfowler)
 License: Apache License v2.0
 
 
+##Installation
+
+Install into a "pagelistplus" folder inside MojoMotor's /system/mojomotor/third-party folder.
+
 ##Usage
 
 	{mojo:pagelistplus:page_list}
