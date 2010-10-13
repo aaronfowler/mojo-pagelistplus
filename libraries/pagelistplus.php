@@ -1,7 +1,7 @@
 <?php if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- * PageListPlus example Addon
+ * PageListPlus Addon
  *
  * @package		MojoMotor
  * @subpackage	Addons
@@ -26,7 +26,7 @@
 class Pagelistplus
 {
 	var $addon;
-	var $addon_version = '1.0';
+	var $addon_version = '1.1';
 	var $site_structure;
 	var $page_id = 0;
 	var $root_parent_page_id = FALSE;
@@ -79,9 +79,17 @@ class Pagelistplus
 		}
 		
 		$start = isset($tag['parameters']['start']) ? $tag['parameters']['start'] : FALSE;
-		$header_tag = isset($tag['parameters']['header']) ? $tag['parameters']['header'] : FALSE;
+		$header = '';
 		
-		if($start=='current' || $start=='parent' || $start=='root')
+		if(isset($tag['parameters']['page']))
+		{
+			if($page = $this->addon->page_model->get_page_by_url_title($tag['parameters']['page']))
+			{
+				$result = parser_page_list(array_find_element_by_key($page->id, $this->site_structure), $attributes);
+				$header = $this->build_header($page->page_title, $page->url_title, $tag);
+			}
+		}
+		else if($start=='current' || $start=='parent' || $start=='root')
 		{
 			if($this->page_id===0) // just run this once, no matter how many times this addon is called
 			{
@@ -103,27 +111,27 @@ class Pagelistplus
 			if($start=='current')
 			{
 				$result = parser_page_list(array_find_element_by_key($this->page_id, $this->site_structure), $attributes);
-				if($header_tag)
+				if(strtolower($tag['parameters']['header_link']) == 'yes' || isset($tag['parameters']['header']))
 				{
-					$header = '<' . $header_tag . '>' . $this->addon->mojomotor_parser->page->page_info->page_title . '</' . $header_tag . '>';
+					$header = $this->build_header($this->addon->mojomotor_parser->page->page_info->page_title, $this->addon->mojomotor_parser->page->page_info->url_title, $tag);
 				}
 			}
 			
 			if($start=='parent' && $this->parent_page_id)
 			{
 				$result = parser_page_list(array_find_element_by_key($this->parent_page_id, $this->site_structure), $attributes);
-				if($header_tag && $page = $this->addon->page_model->get_page($this->parent_page_id))
+				if((strtolower($tag['parameters']['header_link']) == 'yes' || isset($tag['parameters']['header'])) && $page = $this->addon->page_model->get_page($this->parent_page_id))
 				{
-					$header = '<' . $header_tag . '>' . $page->page_title . '</' . $header_tag . '>';
+					$header = $this->build_header($page->page_title, $page->url_title, $tag);
 				}
 			}
 			
 			if($start=='root' && $this->root_parent_page_id)
 			{
 				$result = parser_page_list(array_find_element_by_key($this->root_parent_page_id, $this->site_structure), $attributes);
-				if($header_tag && $page = $this->addon->page_model->get_page($this->root_parent_page_id))
+				if((strtolower($tag['parameters']['header_link']) == 'yes' || isset($tag['parameters']['header'])) && $page = $this->addon->page_model->get_page($this->root_parent_page_id))
 				{
-					$header = '<' . $header_tag . '>' . $page->page_title . '</' . $header_tag . '>';
+					$header = $this->build_header($page->page_title, $page->url_title, $tag);
 				}
 			}
 		}
@@ -169,7 +177,7 @@ class Pagelistplus
 			return $parent;
 		}
 		
-		foreach ($haystack as $key => $value) 
+		foreach ($haystack as $key => $value)
 		{
 			if (is_array($value)) 
 			{
@@ -191,6 +199,36 @@ class Pagelistplus
 	}
 	
 	
+	/**
+	 * Build Header
+	 *
+	 * Returns header string
+	 *
+	 * @access	private
+	 * @param	string
+	 * @param	string
+	 * @param	array
+	 * @return	string
+	 */
+	function build_header($header, $url_title, $tag)
+	{
+		if(strtolower($tag['parameters']['header_link']) == 'yes' || isset($tag['parameters']['header']))
+		{
+			if(strtolower($tag['parameters']['header_link']) == 'yes')
+			{
+				$header = '<a href="' . site_url('page/' . $url_title) . '">' . $header . '</a>';
+			}
+			if(isset($tag['parameters']['header']))
+			{
+				$header = '<' . $tag['parameters']['header'] . '>' . $header . '</' . $tag['parameters']['header'] . '>';
+			}
+			return $header;
+		}
+		
+		return '';
+	}
+	
+
 }
 
 /* End of file pagelistplus.php */

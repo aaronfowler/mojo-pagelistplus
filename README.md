@@ -2,7 +2,7 @@
 
 Page List Plus expands the options available to MojoMotor's native page_list tag
 
-Version: 1.0
+Version: 1.1
 
 Author: Aaron Fowler (http://twitter.com/adfowler)
 
@@ -22,7 +22,9 @@ Without any parameters this outputs a navigation menu identical to MojoMotor's {
 
 ##Parameters
 
-class/id // same as default mojomotor page_list
+Same as default mojomotor page_list
+	class / id / page
+
 
 The "start" parameter tells the tag from where to start building the menu.
 
@@ -38,8 +40,12 @@ Start at the current page's root parent. If the current page is top level, start
 	start="root"
 
 
-Output the page title of the page specified with the start parameter, wrapped in an HTML tag
+Output the page title of the page specified with the start or page parameter, wrapped in an HTML tag
 	header="h1/h2/p/div/etc..."
+
+
+If "yes", output a link to the page title of the page specified with the start or page parameter
+	header_link="yes"
 
 
 If a page list is output prepend/append some text or HTML
@@ -49,13 +55,13 @@ If a page list is output prepend/append some text or HTML
 
 ##Example
 
-	{mojo:pagelistplus:page_list start="parent" header="h2" prepend="<div class='navlinks'>" append="</div>"}
+	{mojo:pagelistplus:page_list start="parent" id="parentnav" header="h2" header_link="yes" prepend="<div class='navlinks'>" append="</div>"}
 
 Outputs:
 
-	<div class='navlinks'>
-		<h2>Parent Page Title</h2>
-		<ul>
+	<div class="navlinks">
+		<h2><a href="http://example.com/page/parent_page">Parent Page Title</a></h2>
+		<ul id="parentnav">
 			<li>...
 		</ul>
 	</div>
