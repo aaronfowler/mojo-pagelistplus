@@ -2,7 +2,7 @@
 
 Page List Plus expands the options available to MojoMotor's native page_list tag
 
-Version: 1.1
+Version: 1.2.0
 
 Author: Aaron Fowler (http://twitter.com/adfowler)
 

@@ -1,10 +1,11 @@
 <?php if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- * PageListPlus Addon
+ * PageListPlus Add-on
  *
  * @package		MojoMotor
  * @subpackage	Addons
+ * @version		1.2.0
  * @author		Aaron Fowler
  * @link		http://twitter.com/adfowler
  * @license		Apache License v2.0
@@ -25,9 +26,9 @@
 
 class Pagelistplus
 {
-	var $addon;
-	var $addon_version = '1.1';
-	var $site_structure;
+	private $addon;
+	var $addon_version = '1.2.0';
+	private $site_structure;
 	var $page_id = 0;
 	var $root_parent_page_id = FALSE;
 	var $parent_page_id = FALSE;
@@ -84,6 +85,7 @@ class Pagelistplus
 		if(isset($tag['parameters']['page']))
 		{
 			if($page = $this->addon->page_model->get_page_by_url_title($tag['parameters']['page']))
+			//if($page = $this->addon->page_model->get_page_by_url_title("page/child-2"))
 			{
 				$result = parser_page_list(array_find_element_by_key($page->id, $this->site_structure), $attributes);
 				$header = $this->build_header($page->page_title, $page->url_title, $tag);
@@ -93,7 +95,7 @@ class Pagelistplus
 		{
 			if($this->page_id===0) // just run this once, no matter how many times this addon is called
 			{
-				if ($page = $this->addon->mojomotor_parser->page->page_info)
+				if ($page = $this->addon->page_model->get_page_by_url_title($this->addon->mojomotor_parser->url_title))
 				{
 					$this->page_id = $page->id;
 					$this->parent_page_id = $this->array_find_parent_by_key($this->page_id, $this->site_structure);
@@ -113,7 +115,7 @@ class Pagelistplus
 				$result = parser_page_list(array_find_element_by_key($this->page_id, $this->site_structure), $attributes);
 				if(strtolower($tag['parameters']['header_link']) == 'yes' || isset($tag['parameters']['header']))
 				{
-					$header = $this->build_header($this->addon->mojomotor_parser->page->page_info->page_title, $this->addon->mojomotor_parser->page->page_info->url_title, $tag);
+					$header = $this->build_header($page->page_title, $page->url_title, $tag);
 				}
 			}
 			
@@ -216,7 +218,7 @@ class Pagelistplus
 		{
 			if(strtolower($tag['parameters']['header_link']) == 'yes')
 			{
-				$header = '<a href="' . site_url('page/' . $url_title) . '">' . $header . '</a>';
+				$header = '<a href="' . site_url($url_title) . '">' . $header . '</a>';
 			}
 			if(isset($tag['parameters']['header']))
 			{
