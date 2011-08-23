@@ -5,11 +5,11 @@
  *
  * @package		MojoMotor
  * @subpackage	Addons
- * @version		1.2.0
+ * @version		1.2.1
  * @author		Aaron Fowler
  * @link		http://twitter.com/adfowler
  * @license		Apache License v2.0
- * @copyright	2010 Aaron Fowler
+ * @copyright	2010-2011 Aaron Fowler
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@
 class Pagelistplus
 {
 	private $addon;
-	var $addon_version = '1.2.0';
+	var $addon_version = '1.2.1';
 	private $site_structure;
 	var $page_id = 0;
 	var $root_parent_page_id = FALSE;
@@ -85,7 +85,6 @@ class Pagelistplus
 		if(isset($tag['parameters']['page']))
 		{
 			if($page = $this->addon->page_model->get_page_by_url_title($tag['parameters']['page']))
-			//if($page = $this->addon->page_model->get_page_by_url_title("page/child-2"))
 			{
 				$result = parser_page_list(array_find_element_by_key($page->id, $this->site_structure), $attributes);
 				$header = $this->build_header($page->page_title, $page->url_title, $tag);
@@ -141,7 +140,6 @@ class Pagelistplus
 		{
 			$result = parser_page_list($this->site_structure, $attributes);
 		}
-		
 		if(!$result || is_numeric($result))
 		{
 			return '';

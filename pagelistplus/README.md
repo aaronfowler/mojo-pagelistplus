@@ -2,7 +2,7 @@
 
 Page List Plus expands the options available to MojoMotor's native page_list tag
 
-Version: 1.2.0
+Version: 1.2.1
 
 Author: Aaron Fowler (http://twitter.com/adfowler)
 
@@ -65,3 +65,5 @@ Outputs:
 			<li>...
 		</ul>
 	</div>
+	
+**NOTE: if you use the `start="parent"` parameter on the home page, nothing shows up because the home page doesn't have a parent**
