@@ -6,21 +6,19 @@
  * Original version Apache License v2.0, 2010, by Aaron Fowler http://twitter.com/adfowler
  * Refactored by GDmac, 2012, Released under OSL3 license, http://rosenlaw.com/OSL3.0-explained.htm
  *
- * OSL3 license means: you are free to use this software in any website and/or application, but...
+ * OSL3 : you are free to use this software in any website and/or application, but...
  * if you alter/modify or change this software, then you have to release and publish those changes too.
  *
  */
 
 class Pagelistplus
 {
-	var $addon_version = '1.3.0';
+	var $addon_version = '1.3.1';
 
 	private $addon;
-	private $site_structure;
 	private $parameters = array();
-	private $all_pages  = array();
-	private $page_list  = array();
-	private $page_refs  = array();
+	private $page_list  = array(); // nested list
+	private $page_refs  = array(); // linear list
 
 	// --------------------------------------------------------------------
 
@@ -28,11 +26,24 @@ class Pagelistplus
 	{
 		$this->addon =& get_instance();
 
-		// Fetch fresh copy of the site structure. 
-		// Just run this once, no matter how many times this addon is called
-		if (empty($this->all_pages) || empty($this->page_refs))
+		if (empty($this->page_refs))
 		{
-			$this->initialize();
+			// default page
+			$defaults = $this->addon->page_model->get_page($this->addon->site_model->get_setting('default_page'));
+			$this->default_page = ($defaults) ? $defaults->url_title : '';
+
+			// current_page or default
+			$this->current_page = trim($this->addon->uri->uri_string, '/');
+			$this->current_page = ($this->current_page == '' ? $this->default_page : $this->current_page);
+
+			// build reference lists
+			$this->page_map = $this->addon->page_model->get_page_map();
+			$this->fresh_list($this->page_map);
+
+			// set mojo_active and parent_active CSS classes
+			$this->set_active_pages();
+
+			//$this->dump('initialize', $this->page_refs);
 		}
 	}
 
@@ -40,90 +51,89 @@ class Pagelistplus
 	
 	function page_list($tag)
 	{
-		$start = FALSE;
-		$tree = FALSE;
-
-		$allowable_parameters = array('start', 'header_link', 'header', 'prepend', 'append',    'page', 'depth', 'class', 'id');
+		if (! $this->page_map) return FALSE;
 
 		$this->parameters = array();
+		$allowable_parameters = array('start','header_link','header','prepend','append','active_children','force_output',    'page', 'depth', 'class', 'id');
 
 		foreach ($allowable_parameters as $param)
 		{
 			$this->parameters[$param] = isset($tag['parameters'][$param]) ? trim($tag['parameters'][$param]) : FALSE;
 		}
 
-		// a straight request for page
+		$start = FALSE;
+		$tree  = array();
+
+		// a straight page=url_title request
 		if ($this->parameters['page'])
 		{
-			$start = $this->find_current_page($this->parameters['page']);
+			$start = $this->find_page($this->parameters['page']);
+			if ($start === FALSE) return 'PAGE not found';
+
 			$tree = array($start => $this->page_refs[$start]);
-
-			$page_info = $this->page_refs[$start];
-			$header = $this->build_header($page_info['page_title'], $page_info['url_title'], $this->parameters);
 		}
-
-
-		// main switch for start parameter
-		switch ($this->parameters['start'])
+		else
 		{
-			case 'current':
-				$start = $this->find_current_page($this->current_page);
-				$tree = array($start => $this->page_refs[$start]);
-			break;
+			$start = $this->find_page($this->current_page);
+			if ($start === FALSE) return 'PAGE not found';
 
-			case 'root':
-				$start = $this->find_root_page($this->current_page);
-				if(!isset($this->page_refs[$start]['children']))
-				{
-					$header = $this->build_header($this->page_refs[$start]['page_title'], $this->page_refs[$start]['url_title']);
-					return $header;
-				}
-				$tree = $this->page_refs[$start]['children'];
-			break;
-
-			case 'parent': 
-				// Legacy: Only show parent, don't show when parent is at root level
-				$start = $this->find_parent_page($this->current_page);
-				if($start)
-				{
+			// start parameter
+			switch ($this->parameters['start'])
+			{
+				case 'current':
 					$tree = array($start => $this->page_refs[$start]);
-				}
-				else
-				{
-					$this->dump($start,$this->parameters,$tree);
-					return FALSE;
-				}
-			break;
+				break;
 
-			default:
-				if($start===false)
-				{
-					$start = $this->find_current_page('');
+				case 'root':
+					$start = $this->page_refs[$start]['root_id'];
+		
+					if(isset($this->page_refs[$start]['children']))
+					{
+						$tree = $this->page_refs[$start]['children'];
+					}
+					else 
+					  $tree = array();
+				break;
+
+				case 'parent': 
+					// Only show parent if current is not root level
+					$start = $this->page_refs[$start]['parent_id'];
+
+					if($start > 0 && isset($this->page_refs[$start]['children']))
+					{
+						$tree = $this->page_refs[$start]['children'];
+					}
+					else 
+					  return FALSE;
+				break;
+
+				default:
 					$tree = $this->page_list;
-				}
+				break;
+			}
 		}
 
-		// debug info
-		//$this->dump($start, $this->parameters, $tree, $this->nested_list($tree, $this->parameters) );
+		//$this->dump($this->parameters, $this->nested_list($tree, $this->parameters));
 
-		// see the lists
-		//$this->dump($this->page_list);
-		//$this->dump($this->page_refs);
+		$result = $this->nested_list($tree, $this->parameters);
 
-
-		// set mojo_active and parent_active on whole tree, nice to have some css to play with :-)
-		$this->set_active_pages($this->current_page);
+		if(empty($result) && $this->parameters['force_output']==FALSE)
+		{
+			return FALSE;
+		}
 
 		$header = $this->build_header($this->page_refs[$start]['page_title'], $this->page_refs[$start]['url_title']);
-		
-		return $header . $this->nested_list($tree, $this->parameters);
+
+		return $this->parameters['prepend'] . PHP_EOL . $header . PHP_EOL . $result . PHP_EOL . $this->parameters['append'];
 
 	}
 
 	// --------------------------------------------------------------------
 
-	function nested_list($tree, $attributes, $level=1)
+	function nested_list($tree, $attributes = array(), $level = 1)
 	{
+		if(empty($tree)) return FALSE;
+
 		$ret  = $level > 1 ? PHP_EOL : '';
 		$ret .= '<ul';
 		$ret .= !empty($attributes['id']) ?' id="'.$attributes['id'].'"':'';
@@ -134,24 +144,96 @@ class Pagelistplus
 		{
 			// set CSS-classes
 			$ret .= '<li class="mojo_page_list_'.$items['url_title'];
-			$ret .= isset($items['active']) ? ' '.$items['active'] : '';
+			$ret .= !empty($items['active']) ? ' '.$items['active'] : '';
+			$ret .= !empty($items['children']) ? ' has_kids': '';
 			$ret .= '">';
 	
 			$ret .= anchor($items['url_title'], $items['page_title']);
 	
 			if (isset($items['children']) && ($this->parameters['depth']===FALSE || $this->parameters['depth'] > $level))
 			{
-				$ret .= $this->nested_list($items['children'], array(), $level+1);
+				if ($this->parameters['active_children']=== FALSE || ($this->parameters['active_children']=='yes' && $items['active'] !=''))
+				{
+					$ret .= $this->nested_list($items['children'], array(), $level+1);
+				}
 			}
-			
 			$ret .= '</li>'.PHP_EOL;
 		}
-
 		$ret .= '</ul>'.PHP_EOL;
 		return $ret;
-
 	}
 
+	// --------------------------------------------------------------------
+
+	function fresh_list($page_map, $parent = 0)
+	{
+		foreach($page_map as $key => $page_info)
+		{
+			// build a reference list
+			$thisref = &$this->page_refs[$key];
+
+			$thisref['id']         = $page_info['id']; // $key
+			$thisref['parent_id']  = $parent;
+			$thisref['page_title'] = $page_info['page_title'];
+			$thisref['url_title']  = $page_info['url_title'];
+
+			// root items are added to page_list, children to page_refs
+			if ($parent == 0)
+			{
+				// store root ID for fast access
+				$thisref['root_id']       = $key; 
+				$this->page_list[$key] = &$thisref;
+			}
+			else
+			{
+				$thisref['root_id']       = $this->page_refs[$parent]['root_id'];
+				$this->page_refs[$parent]['children'][$key] = &$thisref;
+			}
+
+			if(isset($page_info['children']))
+			{
+				$this->fresh_list($page_info['children'], $key);
+			}
+		}
+	}
+
+	// --------------------------------------------------------------------
+
+	function set_active_pages()
+	{
+		foreach($this->page_refs as &$item)
+		{
+			if ($item['url_title'] == $this->current_page)
+			{
+				// current page is mojo_active
+				$item['active'] = 'mojo_active';
+				
+				$parent_id = $item['parent_id'];
+
+				// any parents get parent_active
+				while($parent_id > 0)
+				{
+					$this->page_refs[$parent_id]['active'] = 'parent_active';
+					$parent_id = $this->page_refs[$parent_id]['parent_id'];	
+				}
+			}
+			else $item['active'] = '';
+
+		}
+	}
+
+	// --------------------------------------------------------------------
+
+	function find_page($url_title)
+	{
+		if ($url_title=='') $url_title = $this->default_page;
+
+		foreach($this->page_refs as $item)
+		{
+			if ($item['url_title'] == $url_title) return $item['id'];
+		}
+		return FALSE;
+	}
 
 	// ----------------------------------------------------
 
@@ -161,7 +243,7 @@ class Pagelistplus
 		{
 			if($this->parameters['header_link'] == 'yes')
 			{
-				$header = '<a href="'.site_url($url_title).'">'.$header.'</a>';
+				$header = anchor($url_title, $header);
 			}
 			if($this->parameters['header'] !== FALSE)
 			{
@@ -171,142 +253,6 @@ class Pagelistplus
 		}
 		
 		return '';
-	}
-
-	// --------------------------------------------------------------------
-
-	function find_root_page($url_title)
-	{
-		// no url_title, then the default page
-		if ($url_title=='') $url_title = $this->default_page;
-
-		// walk the pages refs untill we find our url_title
-		foreach($this->page_refs as $item)
-		{
-			if ($item['url_title']==$url_title)
-			{
-				$parent_id = $item['parent_id'];
-
-				if ($parent_id == 0) return $item['id']; // that was easy, found a root item
-
-				// hmmm, walk up the refs array
-				while ($parent_id > 0)
-				{
-					$found_id = $this->page_refs[$parent_id]['id'];
-					$parent_id = $this->page_refs[$parent_id]['parent_id'];
-				}
-
-				return $found_id;
-			} 
-		}
-	}
-
-	// --------------------------------------------------------------------
-	// Legacy, compatibility function
-	// Finds parent id, or returns false if parent is a root item
-
-	function find_parent_page($url_title)
-	{
-		if ($url_title=='') return FALSE;
-
-		foreach($this->page_refs as $item)
-		{
-			if ($item['url_title'] == $url_title)
-			{
-				// not a root-item, and parent not a root item
-				if($item['parent_id'] > 0 && $this->page_refs[$item['parent_id']]['parent_id'] > 0)
-				{
-					return $item['parent_id'];	
-				}
-				else
-				  return false;
-			}
-
-		}
-	}
-
-	// --------------------------------------------------------------------
-	function find_current_page($url_title)
-	{
-		if ($url_title=='') $url_title = $this->default_page;
-
-		foreach($this->page_refs as $item)
-		{
-			if ($item['url_title'] == $url_title) return $item['id'];
-		}
-	}
-
-	// --------------------------------------------------------------------
-	function set_active_pages($url_title)
-	{
-		if ($url_title=='') $url_title = $this->default_page;
-
-		// by reference sets the main array item
-		foreach($this->page_refs as &$item)
-		{
-			if ($item['url_title'] == $url_title)
-			{
-				$item['active'] = 'mojo_active';
-				$parent_id = $item['parent_id'];
-
-				while($parent_id > 0)
-				{
-					$this->page_refs[$parent_id]['active'] = 'parent_active';
-					$parent_id = $this->page_refs[$parent_id]['parent_id'];	
-				}
-			}
-		}
-	}
-
-	// --------------------------------------------------------------------
-	// OMG nesting by reference
-
-	function fresh_list($nested_arr, $parent=0)
-	{
-		foreach($nested_arr as $key => $value)
-		{
-			// build a reference list
-			$thisref = &$this->page_refs[$key];
-
-			// root items are added to page_list, children to page_refs
-			if ($parent == 0)
-			{
-				$this->page_list[$key] = &$thisref;
-			}
-			else
-			{
-				$this->page_refs[$parent]['children'][$key] = &$thisref;
-			}
-
-			$thisref['id']         = $key;
-			$thisref['parent_id']  = $parent;
-			$thisref['page_title'] = $this->all_pages[$key]['page_title'];
-			$thisref['url_title']  = $this->all_pages[$key]['url_title'];
-
-			if(is_array($value))
-			{
-				$this->fresh_list($value, $key);
-			}
-		}
-	}
-
-	// --------------------------------------------------------------------
-
-	function initialize()
-	{
-		// fetch some default settings
-		$this->current_page = trim($this->addon->uri->uri_string, '/');
-
-		$defaults = $this->addon->page_model->get_page($this->addon->site_model->get_setting('default_page'));
-
-		$this->default_page = ($defaults) ? $defaults->url_title : '';
-
-		// fetch structure and pages
-		$this->site_structure = $this->addon->site_model->get_setting('site_structure');
-		$this->all_pages = $this->addon->page_model->get_all_pages_info();
-
-		// build a reference list, the whole shebang
-		$this->fresh_list($this->site_structure);
 	}
 
 	// ----------------------------------------------------
