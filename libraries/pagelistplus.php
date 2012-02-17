@@ -43,7 +43,7 @@ class Pagelistplus
 		$start = FALSE;
 		$tree = FALSE;
 
-		$allowable_parameters = array('start', 'header_link', 'header', 'prepend', 'append',    'page', 'depth', 'class', 'id', 'depth');
+		$allowable_parameters = array('start', 'header_link', 'header', 'prepend', 'append',    'page', 'depth', 'class', 'id');
 
 		$this->parameters = array();
 
@@ -73,7 +73,11 @@ class Pagelistplus
 
 			case 'root':
 				$start = $this->find_root_page($this->current_page);
-				if(!isset($this->page_refs[$start]['children'])) return FALSE;
+				if(!isset($this->page_refs[$start]['children']))
+				{
+					$header = $this->build_header($this->page_refs[$start]['page_title'], $this->page_refs[$start]['url_title']);
+					return $header;
+				}
 				$tree = $this->page_refs[$start]['children'];
 			break;
 
@@ -167,25 +171,6 @@ class Pagelistplus
 		}
 		
 		return '';
-	}
-
-	// --------------------------------------------------------------------
-
-	function initialize()
-	{
-		// fetch some default settings
-		$this->current_page = trim($this->addon->uri->uri_string, '/');
-
-		$defaults = $this->addon->page_model->get_page($this->addon->site_model->get_setting('default_page'));
-
-		$this->default_page = ($defaults) ? $defaults->url_title : '';
-
-		// fetch structure and pages
-		$this->site_structure = $this->addon->site_model->get_setting('site_structure');
-		$this->all_pages = $this->addon->page_model->get_all_pages_info();
-
-		// build a reference list, the whole shebang
-		$this->fresh_list($this->site_structure);
 	}
 
 	// --------------------------------------------------------------------
@@ -303,6 +288,25 @@ class Pagelistplus
 				$this->fresh_list($value, $key);
 			}
 		}
+	}
+
+	// --------------------------------------------------------------------
+
+	function initialize()
+	{
+		// fetch some default settings
+		$this->current_page = trim($this->addon->uri->uri_string, '/');
+
+		$defaults = $this->addon->page_model->get_page($this->addon->site_model->get_setting('default_page'));
+
+		$this->default_page = ($defaults) ? $defaults->url_title : '';
+
+		// fetch structure and pages
+		$this->site_structure = $this->addon->site_model->get_setting('site_structure');
+		$this->all_pages = $this->addon->page_model->get_all_pages_info();
+
+		// build a reference list, the whole shebang
+		$this->fresh_list($this->site_structure);
 	}
 
 	// ----------------------------------------------------
