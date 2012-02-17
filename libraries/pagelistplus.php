@@ -3,234 +3,309 @@
 /**
  * PageListPlus Add-on
  *
- * @package		MojoMotor
- * @subpackage	Addons
- * @version		1.2.0
- * @author		Aaron Fowler
- * @link		http://twitter.com/adfowler
- * @license		Apache License v2.0
- * @copyright	2010 Aaron Fowler
+ * Original version Apache License v2.0, 2010, by Aaron Fowler http://twitter.com/adfowler
+ * Refactored by GDmac, 2012, Released under OSL3 license, http://rosenlaw.com/OSL3.0-explained.htm
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * OSL3 license means: you are free to use this software in any website and/or application, but...
+ * if you alter/modify or change this software, then you have to release and publish those changes too.
  *
- *	http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 class Pagelistplus
 {
+	var $addon_version = '1.3.0';
+
 	private $addon;
-	var $addon_version = '1.2.0';
 	private $site_structure;
-	var $page_id = 0;
-	var $root_parent_page_id = FALSE;
-	var $parent_page_id = FALSE;
-	var $has_siblings = FALSE;
-	var $has_children = FALSE;
+	private $parameters = array();
+	private $all_pages  = array();
+	private $page_list  = array();
+	private $page_refs  = array();
 
 	// --------------------------------------------------------------------
 
-	/**
-	 * Constructor
-	 *
-	 * @access	public
-	 * @return	void
-	 */
 	function __construct()
 	{
 		$this->addon =& get_instance();
-		$this->site_structure = $this->addon->site_model->get_setting('site_structure');
+
+		// Fetch fresh copy of the site structure. 
+		// Just run this once, no matter how many times this addon is called
+		if (empty($this->all_pages) || empty($this->page_refs))
+		{
+			$this->initialize();
+		}
+	}
+
+	// --------------------------------------------------------------------
+	
+	function page_list($tag)
+	{
+		$start = FALSE;
+		$tree = FALSE;
+
+		$allowable_parameters = array('start', 'header_link', 'header', 'prepend', 'append',    'page', 'depth', 'class', 'id', 'depth');
+
+		$this->parameters = array();
+
+		foreach ($allowable_parameters as $param)
+		{
+			$this->parameters[$param] = isset($tag['parameters'][$param]) ? trim($tag['parameters'][$param]) : FALSE;
+		}
+
+		// a straight request for page
+		if ($this->parameters['page'])
+		{
+			$start = $this->find_current_page($this->parameters['page']);
+			$tree = array($start => $this->page_refs[$start]);
+
+			$page_info = $this->page_refs[$start];
+			$header = $this->build_header($page_info['page_title'], $page_info['url_title'], $this->parameters);
+		}
+
+
+		// main switch for start parameter
+		switch ($this->parameters['start'])
+		{
+			case 'current':
+				$start = $this->find_current_page($this->current_page);
+				$tree = array($start => $this->page_refs[$start]);
+			break;
+
+			case 'root':
+				$start = $this->find_root_page($this->current_page);
+				if(!isset($this->page_refs[$start]['children'])) return FALSE;
+				$tree = $this->page_refs[$start]['children'];
+			break;
+
+			case 'parent': 
+				// Legacy: Only show parent, don't show when parent is at root level
+				$start = $this->find_parent_page($this->current_page);
+				if($start)
+				{
+					$tree = array($start => $this->page_refs[$start]);
+				}
+				else
+				{
+					$this->dump($start,$this->parameters,$tree);
+					return FALSE;
+				}
+			break;
+
+			default:
+				if($start===false)
+				{
+					$start = $this->find_current_page('');
+					$tree = $this->page_list;
+				}
+		}
+
+		// debug info
+		//$this->dump($start, $this->parameters, $tree, $this->nested_list($tree, $this->parameters) );
+
+		// see the lists
+		//$this->dump($this->page_list);
+		//$this->dump($this->page_refs);
+
+
+		// set mojo_active and parent_active on whole tree, nice to have some css to play with :-)
+		$this->set_active_pages($this->current_page);
+
+		$header = $this->build_header($this->page_refs[$start]['page_title'], $this->page_refs[$start]['url_title']);
+		
+		return $header . $this->nested_list($tree, $this->parameters);
+
 	}
 
 	// --------------------------------------------------------------------
 
-
-	/**
-	 * Page list
-	 *
-	 * Creates an unordered list of all pages in the site that haven't been
-	 * opted out of appearing in the page_list.
-	 *
-	 * @access	private
-	 * @param	array
-	 * @return	string
-	 */
-	function page_list($tag)
+	function nested_list($tree, $attributes, $level=1)
 	{
-		$this->addon->load->helper(array('page', 'array'));
-		$this->addon->load->model(array('page_model'));
-		$attributes = array();
+		$ret  = $level > 1 ? PHP_EOL : '';
+		$ret .= '<ul';
+		$ret .= !empty($attributes['id']) ?' id="'.$attributes['id'].'"':'';
+		$ret .= !empty($attributes['class']) ?' class="'.$attributes['class'].'"':'';
+		$ret .= '>'.PHP_EOL;
+		
+		foreach($tree as $items)
+		{
+			// set CSS-classes
+			$ret .= '<li class="mojo_page_list_'.$items['url_title'];
+			$ret .= isset($items['active']) ? ' '.$items['active'] : '';
+			$ret .= '">';
+	
+			$ret .= anchor($items['url_title'], $items['page_title']);
+	
+			if (isset($items['children']) && ($this->parameters['depth']===FALSE || $this->parameters['depth'] > $level))
+			{
+				$ret .= $this->nested_list($items['children'], array(), $level+1);
+			}
+			
+			$ret .= '</li>'.PHP_EOL;
+		}
 
-		// Gather up parameters
-		$allowable_parameters = array('class', 'id');
+		$ret .= '</ul>'.PHP_EOL;
+		return $ret;
 
-		foreach ($allowable_parameters as $param)
-		{
-			if (isset($tag['parameters'][$param]))
-			{
-				$attributes[$param] = trim($tag['parameters'][$param]);
-			}
-		}
-		
-		$start = isset($tag['parameters']['start']) ? $tag['parameters']['start'] : FALSE;
-		$header = '';
-		
-		if(isset($tag['parameters']['page']))
-		{
-			if($page = $this->addon->page_model->get_page_by_url_title($tag['parameters']['page']))
-			//if($page = $this->addon->page_model->get_page_by_url_title("page/child-2"))
-			{
-				$result = parser_page_list(array_find_element_by_key($page->id, $this->site_structure), $attributes);
-				$header = $this->build_header($page->page_title, $page->url_title, $tag);
-			}
-		}
-		else if($start=='current' || $start=='parent' || $start=='root')
-		{
-			if($this->page_id===0) // just run this once, no matter how many times this addon is called
-			{
-				if ($page = $this->addon->page_model->get_page_by_url_title($this->addon->mojomotor_parser->url_title))
-				{
-					$this->page_id = $page->id;
-					$this->parent_page_id = $this->array_find_parent_by_key($this->page_id, $this->site_structure);
-					if (!$this->root_parent_page_id)
-					{
-						$this->root_parent_page_id = $this->page_id;
-					}
-				}
-				else
-				{
-					return '';
-				}
-			}
-			
-			if($start=='current')
-			{
-				$result = parser_page_list(array_find_element_by_key($this->page_id, $this->site_structure), $attributes);
-				if(strtolower($tag['parameters']['header_link']) == 'yes' || isset($tag['parameters']['header']))
-				{
-					$header = $this->build_header($page->page_title, $page->url_title, $tag);
-				}
-			}
-			
-			if($start=='parent' && $this->parent_page_id)
-			{
-				$result = parser_page_list(array_find_element_by_key($this->parent_page_id, $this->site_structure), $attributes);
-				if((strtolower($tag['parameters']['header_link']) == 'yes' || isset($tag['parameters']['header'])) && $page = $this->addon->page_model->get_page($this->parent_page_id))
-				{
-					$header = $this->build_header($page->page_title, $page->url_title, $tag);
-				}
-			}
-			
-			if($start=='root' && $this->root_parent_page_id)
-			{
-				$result = parser_page_list(array_find_element_by_key($this->root_parent_page_id, $this->site_structure), $attributes);
-				if((strtolower($tag['parameters']['header_link']) == 'yes' || isset($tag['parameters']['header'])) && $page = $this->addon->page_model->get_page($this->root_parent_page_id))
-				{
-					$header = $this->build_header($page->page_title, $page->url_title, $tag);
-				}
-			}
-		}
-		else // output the default page_list
-		{
-			$result = parser_page_list($this->site_structure, $attributes);
-		}
-		
-		if(!$result || is_numeric($result))
-		{
-			return '';
-		}
-		else
-		{
-			return $tag['parameters']['prepend'] . "\n" . $header . "\n" . $result . "\n" . $tag['parameters']['append'];
-		}
 	}
-	
-	
-	/**
-	 * Array Find Parent By Key
-	 *
-	 * Returns parent page id and sets $this->has_children and $this->has_siblings variables
-	 *
-	 * @access	private
-	 * @param	string
-	 * @param	array
-	 * @return	int
-	 */
-	function array_find_parent_by_key($needle, $haystack = array(), $parent = FALSE, $root_parent = FALSE)
+
+
+	// ----------------------------------------------------
+
+	function build_header($header, $url_title)
 	{
-		if (array_key_exists($needle, $haystack))
+		if ($this->parameters['header_link']=='yes' || $this->parameters['header'] !== FALSE)
 		{
-			if (is_array($haystack[$needle]))
+			if($this->parameters['header_link'] == 'yes')
 			{
-				$this->has_children = TRUE;
+				$header = '<a href="'.site_url($url_title).'">'.$header.'</a>';
 			}
-			if (count($haystack) > 1)
+			if($this->parameters['header'] !== FALSE)
 			{
-				$this->has_siblings = TRUE;
-			}
-			
-			return $parent;
-		}
-		
-		foreach ($haystack as $key => $value)
-		{
-			if (is_array($value)) 
-			{
-				if (!$root_parent)
-				{
-					$root_parent = $key;
-				}
-				$found = $this->array_find_parent_by_key($needle, $haystack[$key], $key, $root_parent);
-				if ($found)
-				{
-					$this->root_parent_page_id = $root_parent;
-					return $found;
-				}
-			}
-			$root_parent = FALSE;
-		}
-		
-		return FALSE;
-	}
-	
-	
-	/**
-	 * Build Header
-	 *
-	 * Returns header string
-	 *
-	 * @access	private
-	 * @param	string
-	 * @param	string
-	 * @param	array
-	 * @return	string
-	 */
-	function build_header($header, $url_title, $tag)
-	{
-		if(strtolower($tag['parameters']['header_link']) == 'yes' || isset($tag['parameters']['header']))
-		{
-			if(strtolower($tag['parameters']['header_link']) == 'yes')
-			{
-				$header = '<a href="' . site_url($url_title) . '">' . $header . '</a>';
-			}
-			if(isset($tag['parameters']['header']))
-			{
-				$header = '<' . $tag['parameters']['header'] . '>' . $header . '</' . $tag['parameters']['header'] . '>';
+				$header = '<'.$this->parameters['header'].'>'.$header.'</'.$this->parameters['header'].'>';
 			}
 			return $header;
 		}
 		
 		return '';
 	}
-	
 
+	// --------------------------------------------------------------------
+
+	function initialize()
+	{
+		// fetch some default settings
+		$this->current_page = trim($this->addon->uri->uri_string, '/');
+
+		$defaults = $this->addon->page_model->get_page($this->addon->site_model->get_setting('default_page'));
+
+		$this->default_page = ($defaults) ? $defaults->url_title : '';
+
+		// fetch structure and pages
+		$this->site_structure = $this->addon->site_model->get_setting('site_structure');
+		$this->all_pages = $this->addon->page_model->get_all_pages_info();
+
+		// build a reference list, the whole shebang
+		$this->fresh_list($this->site_structure);
+	}
+
+	// --------------------------------------------------------------------
+
+	function find_root_page($url_title)
+	{
+		// no url_title, then the default page
+		if ($url_title=='') $url_title = $this->default_page;
+
+		// walk the pages refs untill we find our url_title
+		foreach($this->page_refs as $item)
+		{
+			if ($item['url_title']==$url_title)
+			{
+				$parent_id = $item['parent_id'];
+
+				if ($parent_id == 0) return $item['id']; // that was easy, found a root item
+
+				// hmmm, walk up the refs array
+				while ($parent_id > 0)
+				{
+					$found_id = $this->page_refs[$parent_id]['id'];
+					$parent_id = $this->page_refs[$parent_id]['parent_id'];
+				}
+
+				return $found_id;
+			} 
+		}
+	}
+
+	// --------------------------------------------------------------------
+	// Legacy, compatibility function
+	// Finds parent id, or returns false if parent is a root item
+
+	function find_parent_page($url_title)
+	{
+		if ($url_title=='') return FALSE;
+
+		foreach($this->page_refs as $item)
+		{
+			if ($item['url_title'] == $url_title)
+			{
+				// not a root-item, and parent not a root item
+				if($item['parent_id'] > 0 && $this->page_refs[$item['parent_id']]['parent_id'] > 0)
+				{
+					return $item['parent_id'];	
+				}
+				else
+				  return false;
+			}
+
+		}
+	}
+
+	// --------------------------------------------------------------------
+	function find_current_page($url_title)
+	{
+		if ($url_title=='') $url_title = $this->default_page;
+
+		foreach($this->page_refs as $item)
+		{
+			if ($item['url_title'] == $url_title) return $item['id'];
+		}
+	}
+
+	// --------------------------------------------------------------------
+	function set_active_pages($url_title)
+	{
+		if ($url_title=='') $url_title = $this->default_page;
+
+		// by reference sets the main array item
+		foreach($this->page_refs as &$item)
+		{
+			if ($item['url_title'] == $url_title)
+			{
+				$item['active'] = 'mojo_active';
+				$parent_id = $item['parent_id'];
+
+				while($parent_id > 0)
+				{
+					$this->page_refs[$parent_id]['active'] = 'parent_active';
+					$parent_id = $this->page_refs[$parent_id]['parent_id'];	
+				}
+			}
+		}
+	}
+
+	// --------------------------------------------------------------------
+	// OMG nesting by reference
+
+	function fresh_list($nested_arr, $parent=0)
+	{
+		foreach($nested_arr as $key => $value)
+		{
+			// build a reference list
+			$thisref = &$this->page_refs[$key];
+
+			// root items are added to page_list, children to page_refs
+			if ($parent == 0)
+			{
+				$this->page_list[$key] = &$thisref;
+			}
+			else
+			{
+				$this->page_refs[$parent]['children'][$key] = &$thisref;
+			}
+
+			$thisref['id']         = $key;
+			$thisref['parent_id']  = $parent;
+			$thisref['page_title'] = $this->all_pages[$key]['page_title'];
+			$thisref['url_title']  = $this->all_pages[$key]['url_title'];
+
+			if(is_array($value))
+			{
+				$this->fresh_list($value, $key);
+			}
+		}
+	}
+
+	// ----------------------------------------------------
 	
 	/**
 	  * Debug Helper
@@ -246,7 +321,7 @@ class Pagelistplus
 	    $arguments = func_get_args();
 	    $total_arguments = count($arguments);
 
-	    echo '<fieldset style="background: #fefefe !important; border:2px red solid; padding:5px">';
+	    echo '<fieldset style="background: #fefefe !important; border:2px red solid; padding:5px; text-align:left;">';
 	    echo '<legend style="background:lightgrey; padding:5px;">'.$callee['file'].' @ line: '.$callee['line'].'</legend><pre>';
 	    $i = 0;
 	    foreach ($arguments as $argument)

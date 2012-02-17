@@ -2,12 +2,13 @@
 
 Page List Plus expands the options available to MojoMotor's native page_list tag
 
-Version: 1.2.0
+Version: 1.3.0
 
-Author: Aaron Fowler (http://twitter.com/adfowler)
+Authors: 
+- Aaron Fowler (http://twitter.com/adfowler)
+- Gerhard Dalenoort (http://twitter.com/GDmac)
 
-License: Apache License v2.0
-
+License: OSL3
 
 ##Installation
 
@@ -17,51 +18,67 @@ Install into a "pagelistplus" folder inside MojoMotor's /system/mojomotor/third-
 
 	{mojo:pagelistplus:page_list}
 
-Without any parameters this outputs a navigation menu identical to MojoMotor's {mojo:site:page_list} tag.
+This outputs a navigation menu, almost identical to MojoMotor's {mojo:site:page_list} tag.
+
+- every li item has a CSS class "mojo_page_list_[url_title]"
+- every active page has a class "mojo_active"
+- every active parent page has a class "parent_active"
 
 
 ##Parameters
 
-Same as default mojomotor page_list
-	class / id / page
+pagelistplus accepts the default mojomotor page_list parameters  
+page, depth, class, id, plus some extra
 
+###start=
+The "start" parameter tells the tag from where to start building the menu.  
+There are several options to choose from
 
-The "start" parameter tells the tag from where to start building the menu.
+start="current"  
+Starts from the current page.
 
-Start at the current page
-	start="current"
-
-
+start="parent"  
 Start at the current page's immediate parent. If the current page is top level, outputs nothing.
-	start="parent"
 
+start="root"  
+Starts at the current page's root parent. Shows all the children of the topmost page.  
 
-Start at the current page's root parent. If the current page is top level, start with itself (same as start="current")
-	start="root"
+###header=
+Output the page title of the page specified in the start or page parameter,  
+wrapped in a HTML tag. header="h1/h2/p/div/etc..."
 
+###header_link="yes"
+If set to "yes", the header tag will also output a link in the header
 
-Output the page title of the page specified with the start or page parameter, wrapped in an HTML tag
-	header="h1/h2/p/div/etc..."
-
-
-If "yes", output a link to the page title of the page specified with the start or page parameter
-	header_link="yes"
-
-
-If a page list is output prepend/append some text or HTML
-	prepend="some text or HTML"
-	append="some text or HTML"
+##prepend="some text or HTML" append="some text or HTML"
+If a page list is output prepend/append some custom text or HTML
 
 
 ##Example
 
-	{mojo:pagelistplus:page_list start="parent" id="parentnav" header="h2" header_link="yes" prepend="<div class='navlinks'>" append="</div>"}
+###{mojo:pagelistplus:page_list start="root" depth="1" id="top_nav"}
 
 Outputs:
 
-	<div class="navlinks">
-		<h2><a href="http://example.com/page/parent_page">Parent Page Title</a></h2>
-		<ul id="parentnav">
-			<li>...
-		</ul>
-	</div>
+	<ul id="top_nav">
+		<li class="mojo_page_list_page1 mojo_active"><a href="http://example.com/index.php/welcome">Welcome</a></li>
+		<li class="mojo_page_list_page2"><a href="http://example.com/index.php/about">About</a></li>
+	</ul>
+
+
+###{mojo:pagelistplus:page_list start="root" header_link="no" header="h3" id="side_nav"}
+
+Outputs:
+
+	<h3>Welcome</h3>
+	<ul id="side_nav">
+		<li class="mojo_page_list_ut1"><a href="http://example.com/index.php/ut1">some_page1</a></li>
+		<li class="mojo_page_list_ut2"><a href="http://example.com/index.php/ut2">some_page2</a></li>
+		<li class="mojo_page_list_ut3 parent_active"><a href="http://example.com/index.php/ut3">some_page3</a>
+			<ul>
+				<li class="mojo_page_list_ut4 mojo_active"><a href="http://example.com/index.php/ut4">some_page4</a></li>
+				<li class="mojo_page_list_ut5"><a href="http://example.com/index.php/ut5">some_page5</a></li>
+			</ul>
+		</li>
+	</ul>
+
