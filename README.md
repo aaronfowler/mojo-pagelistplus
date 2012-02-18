@@ -2,13 +2,19 @@
 
 Page List Plus expands the options available to MojoMotor's native page_list tag
 
-Version: 1.3.1
+Version: 1.3.2
 
 Authors: 
 - Aaron Fowler (http://twitter.com/adfowler)
 - Gerhard Dalenoort (http://twitter.com/GDmac)
 
 License: OSL3
+
+##Changes
+
+1.3.x (feb 2012)
+
+- list items have a class (instead of ID) mojo_page_list_url_title, so you can have multiple lists on a page.
 
 ##Installation
 
@@ -20,7 +26,7 @@ Install into a "pagelistplus" folder inside MojoMotor's /system/mojomotor/third-
 
 This outputs a navigation menu, almost identical to MojoMotor's {mojo:site:page_list} tag.
 
-- every page item in the list has a CSS class set to "mojo_page_list_[url_title]"
+- every page item in the list has a CSS class set to "mojo_page_list_url_title"
 - every page that has children, has class "has_kids"
 - the current active page has class "mojo_active"
 - every active parent-page has class "parent_active"

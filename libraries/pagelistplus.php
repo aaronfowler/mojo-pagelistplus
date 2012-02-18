@@ -13,7 +13,7 @@
 
 class Pagelistplus
 {
-	var $addon_version = '1.3.1';
+	var $addon_version = '1.3.2';
 
 	private $addon;
 	private $parameters = array();
@@ -36,8 +36,16 @@ class Pagelistplus
 			$this->current_page = trim($this->addon->uri->uri_string, '/');
 			$this->current_page = ($this->current_page == '' ? $this->default_page : $this->current_page);
 
+			// For older Mojo versions < 1.2 load extra model-methods
+			if (!method_exists($this->addon->page_model, 'get_page_map'))
+			{
+				$this->addon->load->model(array('MY_page_model'));
+				$this->page_map = $this->addon->MY_page_model->get_page_map();
+			}
+			else
+			  $this->page_map = $this->addon->page_model->get_page_map();
+
 			// build reference lists
-			$this->page_map = $this->addon->page_model->get_page_map();
 			$this->fresh_list($this->page_map);
 
 			// set mojo_active and parent_active CSS classes
@@ -106,6 +114,7 @@ class Pagelistplus
 					else 
 					  return FALSE;
 				break;
+
 
 				default:
 					$tree = $this->page_list;
