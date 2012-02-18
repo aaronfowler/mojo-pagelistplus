@@ -13,7 +13,7 @@
 
 class Pagelistplus
 {
-	var $addon_version = '1.3.2';
+	var $addon_version = '1.3.3';
 
 	private $addon;
 	private $parameters = array();
@@ -40,10 +40,10 @@ class Pagelistplus
 			if (!method_exists($this->addon->page_model, 'get_page_map'))
 			{
 				$this->addon->load->model(array('MY_page_model'));
-				$this->page_map = $this->addon->MY_page_model->get_page_map();
+				$this->page_map = $this->addon->MY_page_model->get_page_map('include_in_page_list');
 			}
 			else
-			  $this->page_map = $this->addon->page_model->get_page_map();
+			  $this->page_map = $this->addon->page_model->get_page_map('include_in_page_list');
 
 			// build reference lists
 			$this->fresh_list($this->page_map);
@@ -78,7 +78,7 @@ class Pagelistplus
 			$start = $this->find_page($this->parameters['page']);
 			if ($start === FALSE) return 'PAGE not found';
 
-			$tree = array($start => $this->page_refs[$start]);
+			$tree = isset($this->page_refs[$start]['children']) ? $this->page_refs[$start]['children'] : array();
 		}
 		else
 		{
@@ -89,7 +89,7 @@ class Pagelistplus
 			switch ($this->parameters['start'])
 			{
 				case 'current':
-					$tree = array($start => $this->page_refs[$start]);
+					$tree = isset($this->page_refs[$start]['children']) ? $this->page_refs[$start]['children'] : array();
 				break;
 
 				case 'root':
@@ -99,8 +99,6 @@ class Pagelistplus
 					{
 						$tree = $this->page_refs[$start]['children'];
 					}
-					else 
-					  $tree = array();
 				break;
 
 				case 'parent': 
@@ -111,10 +109,7 @@ class Pagelistplus
 					{
 						$tree = $this->page_refs[$start]['children'];
 					}
-					else 
-					  return FALSE;
 				break;
-
 
 				default:
 					$tree = $this->page_list;
@@ -131,7 +126,8 @@ class Pagelistplus
 			return FALSE;
 		}
 
-		$header = $this->build_header($this->page_refs[$start]['page_title'], $this->page_refs[$start]['url_title']);
+		// build header only for valid page
+		$header = ($start == 0) ? '' : $this->build_header($this->page_refs[$start]['page_title'], $this->page_refs[$start]['url_title']);
 
 		return $this->parameters['prepend'] . PHP_EOL . $header . PHP_EOL . $result . PHP_EOL . $this->parameters['append'];
 
@@ -151,14 +147,18 @@ class Pagelistplus
 		
 		foreach($tree as $items)
 		{
+			if ($items['include_in_page_list']=='n' && $this->parameters['page']!=$items['url_title']) continue;
 			// set CSS-classes
 			$ret .= '<li class="mojo_page_list_'.$items['url_title'];
 			$ret .= !empty($items['active']) ? ' '.$items['active'] : '';
 			$ret .= !empty($items['children']) ? ' has_kids': '';
 			$ret .= '">';
 	
+			// homepage empty anchor, link to site-root.
+			if ($items['url_title'] == $this->default_page) $items['url_title'] = '';
+
 			$ret .= anchor($items['url_title'], $items['page_title']);
-	
+
 			if (isset($items['children']) && ($this->parameters['depth']===FALSE || $this->parameters['depth'] > $level))
 			{
 				if ($this->parameters['active_children']=== FALSE || ($this->parameters['active_children']=='yes' && $items['active'] !=''))
@@ -181,10 +181,11 @@ class Pagelistplus
 			// build a reference list
 			$thisref = &$this->page_refs[$key];
 
-			$thisref['id']         = $page_info['id']; // $key
-			$thisref['parent_id']  = $parent;
-			$thisref['page_title'] = $page_info['page_title'];
-			$thisref['url_title']  = $page_info['url_title'];
+			$thisref['id']                    = $page_info['id']; // same as $key
+			$thisref['parent_id']             = $parent;
+			$thisref['page_title']            = $page_info['page_title'];
+			$thisref['url_title']             = $page_info['url_title'];
+			$thisref['include_in_page_list']  = $page_info['include_in_page_list'];
 
 			// root items are added to page_list, children to page_refs
 			if ($parent == 0)
