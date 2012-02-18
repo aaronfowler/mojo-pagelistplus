@@ -13,7 +13,7 @@
 
 class Pagelistplus
 {
-	var $addon_version = '1.3.3';
+	var $addon_version = '1.3.4';
 
 	private $addon;
 	private $parameters = array();

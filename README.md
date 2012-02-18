@@ -2,7 +2,7 @@
 
 Page List Plus expands the options available to MojoMotor's native page_list tag
 
-Version: 1.3.3
+Version: 1.3.4
 
 Authors: 
 - Aaron Fowler (http://twitter.com/adfowler)
@@ -18,7 +18,7 @@ License: OSL3
 
 ##Installation
 
-Install into a "pagelistplus" folder inside MojoMotor's /system/mojomotor/third-party folder.
+Drop the "pagelistplus" folder into MojoMotor's "/system/mojomotor/third-party" folder.
 
 ##Usage
 
